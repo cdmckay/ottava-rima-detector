@@ -117,11 +117,36 @@ function does_rhyme($str1, $str2) {
 
 function read_stanza_file($path) {
     $stanzas = array();
+
+    $handle = fopen($path, 'r');
+    if ($handle) {
+        $stanza = '';
+        $i = 0;
+        while (($buffer = fgets($handle, 4096)) !== false) {
+            if (substr($buffer, 0, 3) === '---') {
+                continue;
+            }
+            $stanza .= $buffer;
+            $i++;
+            if ($i % 8 === 0) {
+                $stanzas[] = chop($stanza);
+                $stanza = '';
+            }
+        }
+        if (!feof($handle)) {
+            echo "Unexpected fgets() fail.\n";
+        }
+        fclose($handle);
+    }
+
     return $stanzas;
 }
 
 $stanza_positives = read_stanza_file(__DIR__ . '/stanza-positives.txt');
+echo 'Read ' . count($stanza_positives) . ' positive stanza(s).' . "\n";
+
 $stanza_negatives = read_stanza_file(__DIR__ . '/stanza-negatives.txt');
+echo 'Read ' . count($stanza_negatives) . ' negative stanza(s).' . "\n";
 
 foreach ($stanza_positives as $stanza) {
     echo "Stanza positive is " . (is_ottava_rima($stanza) ? "true" : "false") . ".\n";
