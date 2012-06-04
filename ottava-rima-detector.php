@@ -80,21 +80,25 @@ function does_rhyme($str1, $str2) {
                 if (substr($buffer, 0, 3) === ';;;') {
                     continue;
                 }
-                // Remove stress from syllables, as poems can play with stress a lot.
                 list($word, $imploded_syllables) = explode('  ', rtrim($buffer));
                 $syllables = explode(' ', $imploded_syllables);
-                $unstressed_syllables = array();
+                $modified_syllables = array();
                 foreach ($syllables as $syllable) {
-                    if (is_numeric($syllable[strlen($syllable) - 1])) {
-                        $unstressed_syllables[] = substr($syllable, 0, strlen($syllable) - 1);
-                    } else {
-                        $unstressed_syllables[] = $syllable;
+                    $modified_syllable = $syllable;
+                    if (is_numeric($modified_syllable[strlen($modified_syllable) - 1])) {
+                        // Remove stress from syllables, as poems can play with stress a lot.
+                        $modified_syllable = substr($modified_syllable, 0, strlen($modified_syllable) - 1);
                     }
+                    if ($modified_syllable == "ER") {
+                        // Treat the ER rhotic vowel as just a straight-up R.
+                        $modified_syllable = "R";
+                    }
+                    $modified_syllables[] = $modified_syllable;
                 }
                 if (preg_match("/(.+)\(\d+\)/", $word, $matches)) {
-                    $cmu_dict[$matches[1]][] = $unstressed_syllables;
+                    $cmu_dict[$matches[1]][] = $modified_syllables;
                 } else {
-                    $cmu_dict[$word][] = $unstressed_syllables;
+                    $cmu_dict[$word][] = $modified_syllables;
                 }
             }
             if (!feof($handle)) {
