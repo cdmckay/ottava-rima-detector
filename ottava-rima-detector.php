@@ -63,7 +63,11 @@ function is_ottava_rima($stanza, $delimiter = "\n") {
 function does_rhyme_metaphone($str1, $str2) {
     $metaphone1 = metaphone($str1);
     $metaphone2 = metaphone($str2);
-    return substr($metaphone1, -1) === substr($metaphone2, -1);
+    $rhyme = substr($metaphone1, -1) === substr($metaphone2, -1);
+    if (!$rhyme) {
+        echo "$str1 and $str2 don't rhyme (method: metaphone).\n";
+    }
+    return $rhyme;
 }
 
 function does_rhyme($str1, $str2) {
@@ -72,11 +76,25 @@ function does_rhyme($str1, $str2) {
         $handle = fopen(__DIR__ . '/cmu-dict.txt', 'r');
         if ($handle) {
             while (($buffer = fgets($handle, 4096)) !== false) {
-                list($word, $syllables) = explode('  ', $buffer);
+                // Handle comments.
+                if (substr($buffer, 0, 3) === ';;;') {
+                    continue;
+                }
+                // Remove stress from syllables, as poems can play with stress a lot.
+                list($word, $imploded_syllables) = explode('  ', rtrim($buffer));
+                $syllables = explode(' ', $imploded_syllables);
+                $unstressed_syllables = array();
+                foreach ($syllables as $syllable) {
+                    if (is_numeric($syllable[strlen($syllable) - 1])) {
+                        $unstressed_syllables[] = substr($syllable, 0, strlen($syllable) - 1);
+                    } else {
+                        $unstressed_syllables[] = $syllable;
+                    }
+                }
                 if (preg_match("/(.+)\(\d+\)/", $word, $matches)) {
-                    $cmu_dict[$matches[1]][] = explode(' ', $syllables);
+                    $cmu_dict[$matches[1]][] = $unstressed_syllables;
                 } else {
-                    $cmu_dict[$word] = array(explode(' ', $syllables));
+                    $cmu_dict[$word][] = $unstressed_syllables;
                 }
             }
             if (!feof($handle)) {
@@ -112,6 +130,8 @@ function does_rhyme($str1, $str2) {
             }
         }
     }
+
+    echo "$str1 and $str2 don't rhyme (method: CMU dict).\n";
     return false;
 }
 
