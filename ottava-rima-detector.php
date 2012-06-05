@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/functions.php';
+
 /**
  * Determines whether a poem stanza is in the
  * ottava rima rhyming style (a-b-a-b-a-b-c-c).
@@ -18,14 +20,13 @@ function is_ottava_rima($stanza, $delimiter = "\n") {
     }
 
     // Separate the stanza into lines.
-    $lines = explode($delimiter, $stanza);
+    $lines = explode($delimiter, trim($stanza));
 
     // Ensure there are the correct amount of lines.
     if (count($lines) !== 8) {
         return false;
     }
 
-    // Reduce the lines into just the last word.
     $last_words = array();
     foreach ($lines as $line) {
         // Adapted from:
@@ -39,24 +40,97 @@ function is_ottava_rima($stanza, $delimiter = "\n") {
             return false;
         }
 
-        $last_words[] = $line_words[count($line_words) - 1];
+        // Ottava rima poems should be iambic pentameter, so we need to make sure there are 10 syllables.
+        // We're not going to make sure it's da-DUM da-DUM da-DUM da-DUM da-DUM, even though it should be.
+        $syllable_count = 0;
+        foreach ($line_words as $line_word) {
+            $syllable_count += estimate_syllables($line_word);
+        }
+        if ($syllable_count < 8 && $syllable_count > 12) {
+            echo "'" . implode(' ', $line_words) . "' was estimated to have $syllable_count syllable(s).\n";
+        }
+
+        // Get the last word for rhyme detection.
+        $last_words[] = last($line_words);
     }
 
     // Determine whether the a, b, and c rhymes match.
-    $a1 = $last_words[0];
-    $b1 = $last_words[1];
-    $a2 = $last_words[2];
-    $b2 = $last_words[3];
-    $a3 = $last_words[4];
-    $b3 = $last_words[5];
-    $c1 = $last_words[6];
-    $c2 = $last_words[7];
+    list($a1, $b1, $a2, $b2, $a3, $b3, $c1, $c2) = $last_words;
 
     $a_rhyme = does_rhyme($a1, $a2) && does_rhyme($a1, $a3) && does_rhyme($a2, $a3);
     $b_rhyme = does_rhyme($b1, $b2) && does_rhyme($b1, $b2) && does_rhyme($b2, $b3);
     $c_rhyme = does_rhyme($c1, $c2);
 
     return $a_rhyme && $b_rhyme && $c_rhyme;
+}
+
+function estimate_syllables($word) {
+    static $arpabet_vowels = array(
+        'AO', 'AA', 'IY', 'UW', 'EH', 'IH', 'UH', 'AH', 'AX', 'AE', // Monophthongs
+        'EY', 'AY', 'OW', 'AW', 'OY', // Diphthongs
+        'ER' // R-colored vowels
+    );
+    static $english_vowels = array('A', 'E', 'I', 'O', 'U');
+
+    $vowel_count = 0;
+
+    // Count the number of Arpabet vowels in the line.  Failing that, count the English vowels.
+    $phonemes = cmu_dict_get($word);
+    if ($phonemes !== null) {
+        foreach ($phonemes as $phoneme) {
+            if (in_array($phoneme, $arpabet_vowels)) {
+                $vowel_count++;
+            }
+        }
+    } else {
+        echo "Using English vowel counting for $word.\n";
+        $letters = str_split(strtoupper($word));
+        foreach ($letters as $letter) {
+            if (in_array($letter, $english_vowels)) {
+                $vowel_count++;
+            }
+        }
+    }
+
+    return $vowel_count;
+}
+
+function does_rhyme($str1, $str2) {
+    $words_found = true;
+
+    $phonemes1 = cmu_dict_get($str1);
+    if ($phonemes1 === null) {
+        //echo "Word not found: $str1.\n";
+        $words_found = false;
+    }
+
+    $phonemes2 = cmu_dict_get($str2);
+    if ($phonemes2 === null) {
+        //echo "Word not found: $str2.\n";
+        $words_found = false;
+    }
+
+    if (!$words_found) {
+        return does_rhyme_metaphone($str1, $str2);
+    }
+
+    $last_phoneme1 = last($phonemes1);
+    if ($last_phoneme1 === 'ER') {
+        $last_phoneme1 = 'R';
+    }
+
+    $last_phoneme2 = last($phonemes2);
+    if ($last_phoneme2 === 'ER') {
+        $last_phoneme2 = 'R';
+    }
+
+    $rhymes = $last_phoneme1 === $last_phoneme2;
+
+    if (!$rhymes) {
+        echo "$str1 and $str2 don't rhyme (method: CMU dict).\n";
+    }
+
+    return $rhymes;
 }
 
 // has issues with new and hue
@@ -70,73 +144,81 @@ function does_rhyme_metaphone($str1, $str2) {
     return $rhyme;
 }
 
-function does_rhyme($str1, $str2) {
-    static $cmu_dict = array();
-    if (count($cmu_dict) === 0) {
-        $handle = fopen(__DIR__ . '/cmu-dict.txt', 'r');
-        if ($handle) {
-            while (($buffer = fgets($handle, 4096)) !== false) {
-                // Handle comments.
-                if (substr($buffer, 0, 3) === ';;;') {
-                    continue;
-                }
-                list($word, $imploded_syllables) = explode('  ', rtrim($buffer));
-                $syllables = explode(' ', $imploded_syllables);
-                $modified_syllables = array();
-                foreach ($syllables as $syllable) {
-                    $modified_syllable = $syllable;
-                    if (is_numeric($modified_syllable[strlen($modified_syllable) - 1])) {
-                        // Remove stress from syllables, as poems can play with stress a lot.
-                        $modified_syllable = substr($modified_syllable, 0, strlen($modified_syllable) - 1);
-                    }
-                    if ($modified_syllable == "ER") {
-                        // Treat the ER rhotic vowel as just a straight-up R.
-                        $modified_syllable = "R";
-                    }
-                    $modified_syllables[] = $modified_syllable;
-                }
-                if (preg_match("/(.+)\(\d+\)/", $word, $matches)) {
-                    $cmu_dict[$matches[1]][] = $modified_syllables;
-                } else {
-                    $cmu_dict[$word][] = $modified_syllables;
-                }
+function cmu_dict_get($word) {
+    static $cmu_dict = null;
+    if ($cmu_dict === null) {
+        $cmu_dict = cmu_dict_read(__DIR__ . '/cmu-dict.txt');
+    }
+
+    $uppercased_word = strtoupper($word);
+    if (array_key_exists($uppercased_word, $cmu_dict)) {
+        return $cmu_dict[$uppercased_word];
+    }
+
+    // If it ends with 'd, replace with ed.
+    if (ends_with("'D", $uppercased_word)) {
+        return cmu_dict_get(substr($uppercased_word, 0, -2) . 'ED');
+    } else if (ends_with("'S", $uppercased_word)) {
+        return cmu_dict_get(substr($uppercased_word, 0, -2));
+    } else if (ends_with("S", $uppercased_word)) {
+        return cmu_dict_get(substr($uppercased_word, 0, -1));
+    }
+
+    // If it has a - or ' in it, try splitting it and returning the words separate.
+    $split_words = null;
+    if (contains('-', $uppercased_word)) {
+        $split_words = explode('-', $uppercased_word);
+    } else if (contains("'", $uppercased_word)) {
+        $split_words = explode("'", $uppercased_word);
+    }
+    if (!empty($split_words)) {
+        $merged_phonemes = array();
+        foreach ($split_words as $split_word) {
+            $phonemes = cmu_dict_get($split_word);
+            if ($phonemes === null) {
+                return null;
             }
-            if (!feof($handle)) {
-                echo "Unexpected fgets() fail.\n";
-            }
-            fclose($handle);
+            $merged_phonemes = array_merge($merged_phonemes, $phonemes);
         }
-        echo "Read " . count($cmu_dict) . " words to memory.\n";
+        return $merged_phonemes;
     }
 
-    $words_found = true;
+    return null;
+}
 
-    if (!array_key_exists(strtoupper($str1), $cmu_dict)) {
-        //echo "Word not found: $str1.\n";
-        $words_found = false;
-    }
-
-    if (!array_key_exists(strtoupper($str2), $cmu_dict)) {
-        //echo "Word not found: $str2.\n";
-        $words_found = false;
-    }
-
-    if (!$words_found) {
-        return does_rhyme_metaphone($str1, $str2);
-    }
-
-    $pronunciations1 = $cmu_dict[strtoupper($str1)];
-    $pronunciations2 = $cmu_dict[strtoupper($str2)];
-    foreach ($pronunciations1 as $pronunciation1) {
-        foreach ($pronunciations2 as $pronunciation2) {
-            if ($pronunciation1[count($pronunciation1) - 1] === $pronunciation2[count($pronunciation2) - 1]) {
-                return true;
+function cmu_dict_read($path) {
+    $cmu_dict = array();
+    $handle = fopen($path, 'r');
+    if ($handle) {
+        while (($buffer = fgets($handle, 4096)) !== false) {
+            // Handle comments.
+            if (starts_with(';;;', $buffer)) {
+                continue;
+            }
+            list($word, $imploded_phonemes) = explode('  ', rtrim($buffer));
+            $phonemes = explode(' ', $imploded_phonemes);
+            $modified_phonemes = array();
+            foreach ($phonemes as $phoneme) {
+                $modified_phoneme = $phoneme;
+                if (is_numeric(last($modified_phoneme))) {
+                    // Remove stress from phonemes, as poems can play with stress a lot.
+                    $modified_phoneme = substr($modified_phoneme, 0, strlen($modified_phoneme) - 1);
+                }
+                $modified_phonemes[] = $modified_phoneme;
+            }
+            if (preg_match("/(.+)\(\d+\)/", $word, $matches)) {
+                // Ignoring alternative pronunciations for now.
+            } else {
+                $cmu_dict[$word] = $modified_phonemes;
             }
         }
+        if (!feof($handle)) {
+            echo "Unexpected fgets() fail.\n";
+        }
+        fclose($handle);
     }
-
-    echo "$str1 and $str2 don't rhyme (method: CMU dict).\n";
-    return false;
+    echo "Read " . count($cmu_dict) . " words to memory.\n";
+    return $cmu_dict;
 }
 
 function read_stanza_file($path) {
@@ -147,7 +229,7 @@ function read_stanza_file($path) {
         $stanza = '';
         $i = 0;
         while (($buffer = fgets($handle, 4096)) !== false) {
-            if (substr($buffer, 0, 3) === '---') {
+            if (starts_with('---', $buffer)) {
                 continue;
             }
             $stanza .= $buffer;
