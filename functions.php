@@ -15,7 +15,3 @@ function ends_with($suffix, $str) {
 function last($countable) {
     return $countable[count($countable) - 1];
 }
-
-function str_last($str) {
-    return $str[strlen($str) - 1];
-}

@@ -8,10 +8,11 @@ require_once __DIR__ . '/functions.php';
  *
  * @param string $stanza
  * @param string $delimiter
+ * @param int $syllable_tolerance
  * @throws InvalidArgumentException
  * @return bool
  */
-function is_ottava_rima($stanza, $delimiter = "\n") {
+function is_ottava_rima($stanza, $delimiter = "\n", $syllable_tolerance = 2) {
     if (!is_string($stanza)) {
         throw new InvalidArgumentException('The stanza must be a string.');
     }
@@ -27,6 +28,8 @@ function is_ottava_rima($stanza, $delimiter = "\n") {
         return false;
     }
 
+    $min_syllable_count = 10 - $syllable_tolerance;
+    $max_syllable_count = 10 + $syllable_tolerance;
     $last_words = array();
     foreach ($lines as $line) {
         // Adapted from:
@@ -46,7 +49,7 @@ function is_ottava_rima($stanza, $delimiter = "\n") {
         foreach ($line_words as $line_word) {
             $syllable_count += estimate_syllables($line_word);
         }
-        if ($syllable_count < 8 && $syllable_count > 12) {
+        if ($syllable_count < $min_syllable_count && $syllable_count > $max_syllable_count) {
             echo "'" . implode(' ', $line_words) . "' was estimated to have $syllable_count syllable(s).\n";
         }
 
@@ -104,6 +107,13 @@ function estimate_syllables($word) {
     return $vowel_count;
 }
 
+/**
+ * Tests whether two strings rhyme.
+ *
+ * @param $str1
+ * @param $str2
+ * @return bool
+ */
 function does_rhyme($str1, $str2) {
     $words_found = true;
 
@@ -142,7 +152,13 @@ function does_rhyme($str1, $str2) {
     return $rhymes;
 }
 
-// has issues with new and hue
+/**
+ * Tests whether two strings rhyme using the Metaphone phonetic algorithm.
+ *
+ * @param $str1
+ * @param $str2
+ * @return bool
+ */
 function does_rhyme_metaphone($str1, $str2) {
     $metaphone1 = metaphone($str1);
     $metaphone2 = metaphone($str2);
@@ -153,6 +169,12 @@ function does_rhyme_metaphone($str1, $str2) {
     return $rhyme;
 }
 
+/**
+ * Attempts to retrieve the Arpanet phonemes for an English word.
+ *
+ * @param $word
+ * @return array|null
+ */
 function cmu_dict_get($word) {
     static $cmu_dict = null;
     if ($cmu_dict === null) {
@@ -192,6 +214,12 @@ function cmu_dict_get($word) {
     return null;
 }
 
+/**
+ * Returns the specified CMUdict-formatted file as a PHP array.
+ *
+ * @param $path
+ * @return array
+ */
 function cmu_dict_read($path) {
     $cmu_dict = array();
 
@@ -227,6 +255,12 @@ function cmu_dict_read($path) {
     return $cmu_dict;
 }
 
+/**
+ * Returns the specified stanza-formatted file as a PHP array of stanza strings.
+ *
+ * @param $path
+ * @return array
+ */
 function read_stanza_file($path) {
     $stanzas = array();
     $handle = fopen($path, 'r');
