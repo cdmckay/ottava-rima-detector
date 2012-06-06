@@ -5,7 +5,7 @@ function contains($value, $str) {
 }
 
 function starts_with($prefix, $str) {
-    return substr($str, 0, strlen($prefix)) === $prefix;
+    return !strncmp($str, $prefix, strlen($prefix));
 }
 
 function ends_with($suffix, $str) {
@@ -13,8 +13,9 @@ function ends_with($suffix, $str) {
 }
 
 function last($countable) {
-    if (is_string($countable)) {
-        return $countable[strlen($countable) - 1];
-    }
     return $countable[count($countable) - 1];
+}
+
+function str_last($str) {
+    return $str[strlen($str) - 1];
 }

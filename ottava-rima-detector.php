@@ -76,6 +76,15 @@ function estimate_syllables($word) {
 
     // Count the number of Arpabet vowels in the line.  Failing that, count the English vowels.
     $phonemes = cmu_dict_get($word);
+    if ($phonemes === null) {
+        // If it ends with S or 'S, then we can still potentially use the CMU dict, since S and 'S aren't vowels.
+        $uppercased_word = strtoupper($word);
+        if (ends_with("'S", $uppercased_word)) {
+            $phonemes = cmu_dict_get(substr($word, 0, -2));
+        } else if (ends_with("'S", $uppercased_word)) {
+            $phonemes = cmu_dict_get(substr($word, 0, -1));
+        }
+    }
     if ($phonemes !== null) {
         foreach ($phonemes as $phoneme) {
             if (in_array($phoneme, $arpabet_vowels)) {
@@ -83,7 +92,7 @@ function estimate_syllables($word) {
             }
         }
     } else {
-        echo "Using English vowel counting for $word.\n";
+        //echo "Using English vowel counting for $word.\n";
         $letters = str_split(strtoupper($word));
         foreach ($letters as $letter) {
             if (in_array($letter, $english_vowels)) {
@@ -158,17 +167,13 @@ function cmu_dict_get($word) {
     // If it ends with 'd, replace with ed.
     if (ends_with("'D", $uppercased_word)) {
         return cmu_dict_get(substr($uppercased_word, 0, -2) . 'ED');
-    } else if (ends_with("'S", $uppercased_word)) {
-        return cmu_dict_get(substr($uppercased_word, 0, -2));
-    } else if (ends_with("S", $uppercased_word)) {
-        return cmu_dict_get(substr($uppercased_word, 0, -1));
     }
 
     // If it has a - or ' in it, try splitting it and returning the words separate.
     $split_words = null;
     if (contains('-', $uppercased_word)) {
         $split_words = explode('-', $uppercased_word);
-    } else if (contains("'", $uppercased_word)) {
+    } else if (contains("'", $uppercased_word) && !ends_with("'S", $uppercased_word)) {
         $split_words = explode("'", $uppercased_word);
     }
     if (!empty($split_words)) {
@@ -200,15 +205,14 @@ function cmu_dict_read($path) {
             $modified_phonemes = array();
             foreach ($phonemes as $phoneme) {
                 $modified_phoneme = $phoneme;
-                if (is_numeric(last($modified_phoneme))) {
+                if (strlen($modified_phoneme) > 2) {
                     // Remove stress from phonemes, as poems can play with stress a lot.
-                    $modified_phoneme = substr($modified_phoneme, 0, strlen($modified_phoneme) - 1);
+                    $modified_phoneme = substr($modified_phoneme, 0, 2);
                 }
                 $modified_phonemes[] = $modified_phoneme;
             }
-            if (preg_match("/(.+)\(\d+\)/", $word, $matches)) {
-                // Ignoring alternative pronunciations for now.
-            } else {
+            // Ignoring alternate pronunciations for now.
+            if (!ends_with(')', $word)) {
                 $cmu_dict[$word] = $modified_phonemes;
             }
         }
@@ -235,7 +239,7 @@ function read_stanza_file($path) {
             $stanza .= $buffer;
             $i++;
             if ($i % 8 === 0) {
-                $stanzas[] = chop($stanza);
+                $stanzas[] = rtrim($stanza);
                 $stanza = '';
             }
         }
@@ -254,9 +258,10 @@ echo 'Read ' . count($stanza_positives) . ' positive stanza(s).' . "\n";
 $stanza_negatives = read_stanza_file(__DIR__ . '/stanza-negatives.txt');
 echo 'Read ' . count($stanza_negatives) . ' negative stanza(s).' . "\n";
 
-foreach ($stanza_positives as $stanza) {
-    echo "Stanza positive is " . (is_ottava_rima($stanza) ? "true" : "false") . ".\n";
+foreach ($stanza_positives as $i => $stanza) {
+    //if ($i !== 10) continue;
+    echo "Stanza positive $i " . (is_ottava_rima($stanza) ? "is" : "is NOT") . " ottava rima.\n";
 }
-foreach ($stanza_negatives as $stanza) {
-    echo "Stanza negative is " . (is_ottava_rima($stanza) ? "true" : "false") . ".\n";
+foreach ($stanza_negatives as $i => $stanza) {
+    echo "Stanza negative $i " . (is_ottava_rima($stanza) ? "is" : "is NOT") . " ottava rima.\n";
 }
