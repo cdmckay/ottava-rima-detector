@@ -2,6 +2,8 @@
   <dictionary name="cdmckay">
     <words>
       <w>arpabet</w>
+      <w>ottava</w>
+      <w>rima</w>
       <w>uppercased</w>
     </words>
   </dictionary>

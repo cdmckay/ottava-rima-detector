@@ -160,8 +160,9 @@ function cmu_dict_get($word) {
     }
 
     $uppercased_word = strtoupper($word);
-    if (array_key_exists($uppercased_word, $cmu_dict)) {
-        return $cmu_dict[$uppercased_word];
+    $result = $cmu_dict[$uppercased_word];
+    if ($result !== null) {
+        return $result;
     }
 
     // If it ends with 'd, replace with ed.
@@ -193,6 +194,7 @@ function cmu_dict_get($word) {
 
 function cmu_dict_read($path) {
     $cmu_dict = array();
+
     $handle = fopen($path, 'r');
     if ($handle) {
         while (($buffer = fgets($handle, 4096)) !== false) {
@@ -221,13 +223,12 @@ function cmu_dict_read($path) {
         }
         fclose($handle);
     }
-    echo "Read " . count($cmu_dict) . " words to memory.\n";
+
     return $cmu_dict;
 }
 
 function read_stanza_file($path) {
     $stanzas = array();
-
     $handle = fopen($path, 'r');
     if ($handle) {
         $stanza = '';
@@ -252,16 +253,16 @@ function read_stanza_file($path) {
     return $stanzas;
 }
 
-$stanza_positives = read_stanza_file(__DIR__ . '/stanza-positives.txt');
-echo 'Read ' . count($stanza_positives) . ' positive stanza(s).' . "\n";
+$positive_stanza = read_stanza_file(__DIR__ . '/stanza-positives.txt');
+echo 'Read ' . count($positive_stanza) . ' positive stanza(s).' . "\n";
 
-$stanza_negatives = read_stanza_file(__DIR__ . '/stanza-negatives.txt');
-echo 'Read ' . count($stanza_negatives) . ' negative stanza(s).' . "\n";
+$negative_stanza = read_stanza_file(__DIR__ . '/stanza-negatives.txt');
+echo 'Read ' . count($negative_stanza) . ' negative stanza(s).' . "\n";
 
-foreach ($stanza_positives as $i => $stanza) {
+foreach ($positive_stanza as $i => $stanza) {
     //if ($i !== 10) continue;
-    echo "Stanza positive $i " . (is_ottava_rima($stanza) ? "is" : "is NOT") . " ottava rima.\n";
+    echo "Positive stanza $i " . (is_ottava_rima($stanza) ? "is" : "is NOT") . " ottava rima.\n";
 }
-foreach ($stanza_negatives as $i => $stanza) {
-    echo "Stanza negative $i " . (is_ottava_rima($stanza) ? "is" : "is NOT") . " ottava rima.\n";
+foreach ($negative_stanza as $i => $stanza) {
+    echo "Negative stanza $i " . (is_ottava_rima($stanza) ? "is" : "is NOT") . " ottava rima.\n";
 }
