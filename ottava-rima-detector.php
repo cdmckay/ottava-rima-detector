@@ -67,6 +67,12 @@ function is_ottava_rima($stanza, $delimiter = "\n", $syllable_tolerance = 2) {
     return $a_rhyme && $b_rhyme && $c_rhyme;
 }
 
+/**
+ * Estimates the number of syllables in a word.
+ *
+ * @param $word
+ * @return int The non-negative number of syllables.
+ */
 function estimate_syllables($word) {
     static $arpabet_vowels = array(
         'AO', 'AA', 'IY', 'UW', 'EH', 'IH', 'UH', 'AH', 'AX', 'AE', // Monophthongs
