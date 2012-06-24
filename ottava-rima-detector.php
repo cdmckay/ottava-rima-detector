@@ -3,16 +3,17 @@
 require_once __DIR__ . '/functions.php';
 
 /**
- * Determines whether a poem stanza is in the
- * ottava rima rhyming style (a-b-a-b-a-b-c-c).
+ * Determines the ottava rima fitness of the stanza.
+ * A value of 0 is ottava rima.
+ * Increasing values are less fit.
  *
- * @param string $stanza
+ * @param $stanza
  * @param string $delimiter
  * @param int $syllable_tolerance
+ * @return bool|int|number
  * @throws InvalidArgumentException
- * @return bool
  */
-function is_ottava_rima($stanza, $delimiter = "\n", $syllable_tolerance = 2) {
+function ottava_rima_fitness($stanza, $delimiter = "\n", $syllable_tolerance = 2) {
     if (!is_string($stanza)) {
         throw new InvalidArgumentException('The stanza must be a string.');
     }
@@ -20,12 +21,23 @@ function is_ottava_rima($stanza, $delimiter = "\n", $syllable_tolerance = 2) {
         throw new InvalidArgumentException('The delimiter must be a string.');
     }
 
+    // Fitness starts at 0.
+    $fitness = 0;
+
     // Separate the stanza into lines.
     $lines = explode($delimiter, trim($stanza));
 
     // Ensure there are the correct amount of lines.
     if (count($lines) !== 8) {
-        return false;
+        $fitness += abs(8 - count($lines));
+
+        // Ensures there are at most 8 lines.
+        array_splice($lines, 8);
+
+        // If there are less than 8, add on blank lines.
+        for ($i = count($lines); $i < 8; $i++) {
+            $lines[] = '';
+        }
     }
 
     $min_syllable_count = 10 - $syllable_tolerance;
@@ -39,10 +51,6 @@ function is_ottava_rima($stanza, $delimiter = "\n", $syllable_tolerance = 2) {
         // This discriminates cases such as "don't" and "he said 'ouch!'"
         $line_words = preg_split('/((^\p{P}+)|(\p{P}*\s+\p{P}*)|(\p{P}+$))/', $line, -1, PREG_SPLIT_NO_EMPTY);
 
-        if (count($line_words) === 0) {
-            return false;
-        }
-
         // Ottava rima poems should be iambic pentameter, so we need to make sure there are 10 syllables.
         // We're not going to make sure it's da-DUM da-DUM da-DUM da-DUM da-DUM, even though it should be.
         $syllable_count = 0;
@@ -50,21 +58,26 @@ function is_ottava_rima($stanza, $delimiter = "\n", $syllable_tolerance = 2) {
             $syllable_count += estimate_syllables($line_word);
         }
         if ($syllable_count < $min_syllable_count && $syllable_count > $max_syllable_count) {
+            $fitness += abs(10 - $syllable_count);
             echo "'" . implode(' ', $line_words) . "' was estimated to have $syllable_count syllable(s).\n";
         }
 
-        // Get the last word for rhyme detection.
-        $last_words[] = last($line_words);
+        // Get the last words for rhyme detection.
+        $last_words[] = count($line_words) > 0 ? last($line_words) : '';
     }
 
     // Determine whether the a, b, and c rhymes match.
     list($a1, $b1, $a2, $b2, $a3, $b3, $c1, $c2) = $last_words;
 
-    $a_rhyme = does_rhyme($a1, $a2) && does_rhyme($a1, $a3) && does_rhyme($a2, $a3);
-    $b_rhyme = does_rhyme($b1, $b2) && does_rhyme($b1, $b2) && does_rhyme($b2, $b3);
-    $c_rhyme = does_rhyme($c1, $c2);
+    $fitness += !does_rhyme($a1, $a2);
+    $fitness += !does_rhyme($a1, $a3);
+    $fitness += !does_rhyme($a2, $a3);
+    $fitness += !does_rhyme($b1, $b2);
+    $fitness += !does_rhyme($b1, $b3);
+    $fitness += !does_rhyme($b2, $b3);
+    $fitness += !does_rhyme($c1, $c2);
 
-    return $a_rhyme && $b_rhyme && $c_rhyme;
+    return $fitness;
 }
 
 /**
@@ -300,9 +313,10 @@ $negative_stanza = read_stanza_file(__DIR__ . '/stanza-negatives.txt');
 echo 'Read ' . count($negative_stanza) . ' negative stanza(s).' . "\n";
 
 foreach ($positive_stanza as $i => $stanza) {
-    //if ($i !== 10) continue;
-    echo "Positive stanza $i " . (is_ottava_rima($stanza) ? "is" : "is NOT") . " ottava rima.\n";
+    $fitness = ottava_rima_fitness($stanza);
+    echo "Positive stanza $i " . ($fitness === 0 ? "is" : "is NOT") . " ottava rima (fitness = $fitness).\n";
 }
 foreach ($negative_stanza as $i => $stanza) {
-    echo "Negative stanza $i " . (is_ottava_rima($stanza) ? "is" : "is NOT") . " ottava rima.\n";
+    $fitness = ottava_rima_fitness($stanza);
+    echo "Negative stanza $i " . ($fitness === 0 ? "is" : "is NOT") . " ottava rima (fitness = $fitness).\n";
 }
