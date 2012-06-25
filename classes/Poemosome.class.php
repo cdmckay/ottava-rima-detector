@@ -1,20 +1,21 @@
 <?php
 
-class Chromosome {
-
-    private $delimiter;
-    private $syllable_tolerance;
+class Poemosome {
 
     private $genes;
+    private $delimiter;
+    private $crossoverRate = 0.7;
+    private $mutationRate = 0.001;
 
-    function __construct(
-        $stanza,
-        $delimiter = "\n",
-        $syllable_tolerance = 2
-    ) {
+    private function __construct($genes, $delimiter) {
+        $this->genes = $genes;
         $this->delimiter = $delimiter;
-        $this->syllable_tolerance = $syllable_tolerance;
+    }
 
+    static function fromStanza(
+        $stanza,
+        $delimiter = "\n"
+    ) {
         // All the genes in the chromosome.
         $genes = array();
 
@@ -33,12 +34,23 @@ class Chromosome {
             $genes[] = $delimiter;
         }
 
-        $this->genes = $genes;
+        return new Poemosome($genes, $delimiter);
     }
 
-    function crossover(Chromosome $chromosome) {
-        $genes1 = $this->getGenes();
-        $genes2 = $chromosome->getGenes();
+    static function fromGenes(
+        $genes,
+        $delimiter = "\n"
+    ) {
+        return new Poemosome($genes, $delimiter);
+    }
+
+    function crossover(Poemosome $poemosome) {
+        if (mt_rand(0, 1000 - 1) > $this->crossoverRate * 1000) {
+            return;
+        }
+
+        $genes1 = $this->genes;
+        $genes2 = $poemosome->getGenes();
 
         // The chromosomes might have a different number of genes, so we need to
         // determine a maximum point we can crossover at.
@@ -49,7 +61,15 @@ class Chromosome {
         $newGenes2 = array_merge(array_slice($genes2, 0, $point), array_slice($genes1, $point));
 
         $this->setGenes($newGenes1);
-        $chromosome->setGenes($newGenes2);
+        $poemosome->setGenes($newGenes2);
+    }
+
+    function mutate($mutator) {
+        foreach ($this->genes as $i => $gene) {
+            if (mt_rand(0, 1000 - 1) <= $this->mutationRate * 1000) {
+                $this->genes[$i] = $mutator($this->genes[$i]);
+            }
+        }
     }
 
     function __toString() {
@@ -58,12 +78,12 @@ class Chromosome {
         return $stanza;
     }
 
-    public function setGenes($genes) {
-        $this->genes = $genes;
-    }
-
     public function getGenes() {
         return $this->genes;
+    }
+
+    public function setGenes($genes) {
+        $this->genes = $genes;
     }
 
 }
