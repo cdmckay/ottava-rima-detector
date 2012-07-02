@@ -4,6 +4,7 @@ class CMUDict {
 
     private $keys = array();
     private $values = array();
+    private $count = 0;
 
     private function __construct() {
         $handle = fopen(__DIR__ . '/cmu-dict.txt', 'r');
@@ -35,6 +36,7 @@ class CMUDict {
             fclose($handle);
         }
         $this->keys = array_keys($this->values);
+        $this->count = count($this->values);
     }
 
     // No cloning!
@@ -88,7 +90,7 @@ class CMUDict {
         $word = null;
         $suitable = false;
         while (!$suitable) {
-            $word = strtolower(array_rand($this->keys));
+            $word = strtolower($this->keys[mt_rand(0, $this->count - 1)]);
             // Ensure it starts with a letter and not punctuation.
             if (preg_match('/^[a-z]/', $word)) {
                 $suitable = true;

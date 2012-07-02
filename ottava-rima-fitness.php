@@ -1,15 +1,17 @@
 <?php
 
+require_once __DIR__ . '/common.php';
 require_once __DIR__ . '/classes/CMUDict.class.php';
-require_once __DIR__ . '/functions.php';
+
+define('OTTAVA_RIMA_FITNESS_DEBUG', false);
 
 /**
  * Determines the ottava rima fitness of a poem stanza.
  *
- * @param $stanza
+ * @param string $stanza
  * @param string $delimiter
  * @param int $syllable_tolerance
- * @return bool|int|number
+ * @return int
  * @throws InvalidArgumentException
  */
 function ottava_rima_fitness($stanza, $delimiter = "\n", $syllable_tolerance = 2) {
@@ -58,7 +60,7 @@ function ottava_rima_fitness($stanza, $delimiter = "\n", $syllable_tolerance = 2
         }
         if ($syllable_count < $min_syllable_count && $syllable_count > $max_syllable_count) {
             $score += abs(10 - $syllable_count);
-            if (PHP_SAPI === 'cli') {
+            if (OTTAVA_RIMA_FITNESS_DEBUG) {
                 echo "'" . implode(' ', $line_words) . "' was estimated to have $syllable_count syllable(s).\n";
             }
         }
@@ -70,13 +72,13 @@ function ottava_rima_fitness($stanza, $delimiter = "\n", $syllable_tolerance = 2
     // Determine whether the a, b, and c rhymes match.
     list($a1, $b1, $a2, $b2, $a3, $b3, $c1, $c2) = $last_words;
 
-    $score += !does_rhyme($a1, $a2) * 10;
-    $score += !does_rhyme($a1, $a3) * 10;
-    $score += !does_rhyme($a2, $a3) * 10;
-    $score += !does_rhyme($b1, $b2) * 10;
-    $score += !does_rhyme($b1, $b3) * 10;
-    $score += !does_rhyme($b2, $b3) * 10;
-    $score += !does_rhyme($c1, $c2) * 10;
+    $score += !does_rhyme($a1, $a2) * 20;
+    $score += !does_rhyme($a1, $a3) * 20;
+    $score += !does_rhyme($a2, $a3) * 20;
+    $score += !does_rhyme($b1, $b2) * 20;
+    $score += !does_rhyme($b1, $b3) * 20;
+    $score += !does_rhyme($b2, $b3) * 20;
+    $score += !does_rhyme($c1, $c2) * 20;
 
     return max(0, 200 - $score);
 }
@@ -84,7 +86,7 @@ function ottava_rima_fitness($stanza, $delimiter = "\n", $syllable_tolerance = 2
 /**
  * Estimates the number of syllables in a word.
  *
- * @param $word
+ * @param string $word
  * @return int The non-negative number of syllables.
  */
 function estimate_syllables($word) {
@@ -131,8 +133,8 @@ function estimate_syllables($word) {
 /**
  * Tests whether two strings rhyme.
  *
- * @param $str1
- * @param $str2
+ * @param string $str1
+ * @param string $str2
  * @return bool
  */
 function does_rhyme($str1, $str2) {
@@ -153,7 +155,7 @@ function does_rhyme($str1, $str2) {
         $metaphone1 = metaphone($str1);
         $metaphone2 = metaphone($str2);
         $rhyme = substr($metaphone1, -1) === substr($metaphone2, -1);
-        if (!$rhyme && PHP_SAPI === 'cli') {
+        if (!$rhyme && OTTAVA_RIMA_FITNESS_DEBUG) {
             echo "$str1 and $str2 don't rhyme (method: Metaphone).\n";
         }
         return $rhyme;
@@ -171,60 +173,11 @@ function does_rhyme($str1, $str2) {
 
     $rhymes = $last_phoneme1 === $last_phoneme2;
 
-    if (!$rhymes && PHP_SAPI === 'cli') {
+    if (!$rhymes && OTTAVA_RIMA_FITNESS_DEBUG) {
         echo "$str1 and $str2 don't rhyme (method: CMUDict).\n";
     }
 
     return $rhymes;
 }
 
-/**
- * Returns the specified stanza-formatted file as a PHP array of stanza strings.
- *
- * @param $path
- * @return array
- */
-function read_stanza_file($path) {
-    $stanzas = array();
-    $handle = fopen($path, 'r');
-    if ($handle) {
-        $stanza = '';
-        $i = 0;
-        while (($buffer = fgets($handle, 4096)) !== false) {
-            if (starts_with('---', $buffer)) {
-                continue;
-            }
-            $stanza .= $buffer;
-            $i++;
-            if ($i % 8 === 0) {
-                $stanzas[] = rtrim($stanza);
-                $stanza = '';
-            }
-        }
-        if (!feof($handle)) {
-            echo "Unexpected fgets() fail.\n";
-        }
-        fclose($handle);
-    }
 
-    return $stanzas;
-}
-
-if (PHP_SAPI === 'cli') {
-
-    $positive_stanza = read_stanza_file(__DIR__ . '/stanza-positives.txt');
-    echo 'Read ' . count($positive_stanza) . ' positive stanza(s).' . "\n";
-
-    $negative_stanza = read_stanza_file(__DIR__ . '/stanza-negatives.txt');
-    echo 'Read ' . count($negative_stanza) . ' negative stanza(s).' . "\n";
-
-    foreach ($positive_stanza as $i => $stanza) {
-        $fitness = ottava_rima_fitness($stanza);
-        echo "Positive stanza $i " . ($fitness === 200 ? "is" : "is NOT") . " ottava rima.\n";
-    }
-    foreach ($negative_stanza as $i => $stanza) {
-        $fitness = ottava_rima_fitness($stanza);
-        echo "Negative stanza $i " . ($fitness === 200 ? "is" : "is NOT") . " ottava rima.\n";
-    }
-
-}
